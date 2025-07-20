@@ -138,16 +138,7 @@ Score Range	Risk Level
 201 – 500	Moderate Risk
 501 – 1000	Low Risk
 
-🧪 How to Run
-bash
-Copy
-Edit
-# Clone the repo
-git clone https://github.com/yourusername/defi-credit-scoring-aave-v2.git
-cd defi-credit-scoring-aave-v2
-
-# Run the scoring pipeline
-python main.py /path/to/your/aave_v2_data.json
+##🧪 How to Run
 
 ```bash
 python main.py /path/to/user-wallet-transactions.json
