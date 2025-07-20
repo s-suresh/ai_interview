@@ -3,7 +3,9 @@ import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-
+from sklearn.preprocessing import MinMaxScaler
+from xgboost import XGBRegressor
+from sklearn.model_selection import train_test_split
 
 def load_transactions(file_path):
     with open(file_path) as f:
@@ -43,7 +45,7 @@ def compute_wallet_features(df):
             total_borrow = borrows['usd_amount'].sum()
             total_repay = repays['usd_amount'].sum()
             borrow_deposit_ratio = total_borrow / total_deposit if total_deposit > 0 else 0
-            repayment_ratio = total_repay / total_borrow if total_borrow > 0 else 1.0
+            repay_ratio = total_repay / total_borrow if total_borrow > 0 else 1.0
 
             unique_days = group['timestamp'].dt.date.nunique()
             activity_span = (group['timestamp'].max() - group['timestamp'].min()).days + 1
@@ -52,7 +54,7 @@ def compute_wallet_features(df):
                 'wallet': wallet,
                 'total_deposit': total_deposit,
                 'total_borrow': total_borrow,
-                'repayment_ratio': repayment_ratio,
+                'repay_ratio': repay_ratio,
                 'borrow_deposit_ratio': borrow_deposit_ratio,
                 'num_liquidations': len(liquidations),
                 'unique_days': unique_days,
@@ -60,17 +62,81 @@ def compute_wallet_features(df):
                 'num_actions': len(group)
             })
         return pd.DataFrame(features)
+def engineer_features(df):
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df['amount'] = df['actionData'].apply(lambda x: float(x['amount']) if isinstance(x, dict) and 'amount' in x else 0)
 
+    def compute_features(x):
+        total_deposit = x[x['action'] == 'deposit']['amount'].sum()
+        total_borrow = x[x['action'] == 'borrow']['amount'].sum()
+        total_repay = x[x['action'] == 'repay']['amount'].sum()
+        total_redeem = x[x['action'] == 'redeemunderlying']['amount'].sum()
+        liquidation_count = (x['action'] == 'liquidationcall').sum()
+        borrow_count = (x['action'] == 'borrow').sum()
+
+        return pd.Series({
+            'tx_count': len(x),
+            'active_days': x['timestamp'].dt.date.nunique(),
+            'total_deposit': total_deposit,
+            'total_borrow': total_borrow,
+            'total_repay': total_repay,
+            'total_redeem': total_redeem,
+            'liquidation_count': liquidation_count,
+            'repay_ratio': total_repay / total_borrow if total_borrow > 0 else 0,
+            'liquidation_ratio': liquidation_count / borrow_count if borrow_count > 0 else 0,
+        })
+
+    features = df.groupby('userWallet').apply(compute_features).fillna(0).reset_index()
+    return features
+def create_scores_from_heuristics(features):
+    # Simulate a credit score between 0-1000 using weighted features
+    score = ((
+        + 0.4 * features['repay_ratio'].clip(0, 1)
+        - 0.6 * features['liquidation_ratio'].clip(0, 1)
+        + 0.1 * (features['total_repay'] / (features['total_borrow'] + 1))
+        + 0.1 * features['active_days'])
+    )
+    print(score.head())
+    return MinMaxScaler(feature_range=(0, 1000)).fit_transform(score.values.reshape(-1, 1)).flatten()
+
+
+def scale_and_score(features_df):
+
+
+    X = features_df.drop(columns=['userWallet'], errors='ignore')
+
+    # Handle missing values or non-numeric types
+    X = X.select_dtypes(include=['number']).fillna(0)
+
+    # Target: mean-based proxy if no labels
+    y = features_df['score1'].values
+
+    # Normalize features
+    scaler = MinMaxScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # Train model
+    model = XGBRegressor()
+    model.fit(X_scaled, y)
+
+    # Predict scores
+    raw_scores = model.predict(X_scaled)
+
+    # Scale scores to 0–1000
+    score_scaler = MinMaxScaler(feature_range=(0, 1000))
+    scaled_scores = score_scaler.fit_transform(raw_scores.reshape(-1, 1)).flatten()
+
+    return pd.DataFrame({'score': scaled_scores.astype(int)})
 
 
 def score_wallet(row):
     score = 300 # Let this be the threshold
 
-    if row['repayment_ratio'] >= 0.9:# High repayment ratio means good customer so add points
+    if row['repay_ratio'] >= 0.9:# High repayment ratio means good customer so add points
         score += 200
-    elif row['repayment_ratio'] >= 0.7:# Medium repayment ratio means ok customer so add a reasonable number of points
+    elif row['repay_ratio'] >= 0.7:# Medium repayment ratio means ok customer so add a reasonable number of points
         score += 100
-    elif row['repayment_ratio'] < 0.3:# Low repayment ratio means they're irresponsible and are a cause for risk, so deduct points
+    elif row['repay_ratio'] < 0.3:# Low repayment ratio means they're irresponsible and are a cause for risk, so deduct points
         score -= 200
 
     if row['borrow_deposit_ratio'] <= 1.5:# The wallet is cautious — it borrows less than it deposits.
@@ -101,7 +167,7 @@ def plot_activity_scatter(df):
         x='activity_span',
         y='unique_days',
         data=df,
-        hue='repayment_ratio',
+        hue='repay_ratio',
         palette='coolwarm',
         alpha=0.7
     )
@@ -114,7 +180,7 @@ def plot_activity_scatter(df):
     plt.show()
 def plot_repayment_histogram(df):
     plt.figure(figsize=(8,5))
-    sns.histplot(df['repayment_ratio'], bins=20, kde=True, color='green')
+    sns.histplot(df['repay_ratio'], bins=20, kde=True, color='green')
     plt.title('Repayment Ratio Distribution')
     plt.xlabel('Repayment Ratio')
     plt.ylabel('Number of Wallets')
@@ -129,7 +195,7 @@ def plot_borrow_deposit_box(df):
     plt.show()
 def plot_feature_correlation(df):
     features = df[[
-        'total_deposit', 'total_borrow', 'repayment_ratio',
+        'total_deposit', 'total_borrow', 'repay_ratio',
         'borrow_deposit_ratio', 'unique_days', 'activity_span', 'num_liquidations'
     ]]
     corr = features.corr()
@@ -152,10 +218,17 @@ def main(file_path):
     df = load_transactions(file_path)
     df = preprocess(df)
     features_df = compute_wallet_features(df)
-    features_df['score'] = features_df.apply(score_wallet, axis=1)
+    features_df['score1'] = features_df.apply(score_wallet, axis=1)
 
-    features_df['risk_level'] = features_df['score'].apply(risk_level)
-    output = features_df[['wallet', 'score','risk_level']].to_dict(orient='records')
+    features=engineer_features(df)
+    features_df['score2'] = scale_and_score(features_df)
+    print("Columns in features_df:", features_df.columns.tolist())
+    print(features_df.head(11))
+    print(features_df[['wallet', 'score2']].head(10))
+    print(features_df['score2'].describe())
+
+    features_df['risk_level'] = features_df['score1'].apply(risk_level)
+    output = features_df[['wallet', 'score1','score2','risk_level']].to_dict(orient='records')
     print(json.dumps(output, indent=2))
     output_path = "scored_wallets.json"
     with open(output_path, 'w') as f:
