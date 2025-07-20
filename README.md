@@ -129,9 +129,25 @@ model.fit(X_scaled, y)  # y is proxy label (e.g., row-wise mean)
 
 # Predict and scale
 raw_scores = model.predict(X_scaled)
-final_scores = MinMaxScaler((0, 1000)).fit_transform(raw_scores.reshape(-1, 1)).flatten() ```
+final_scores = MinMaxScaler((0, 1000)).fit_transform(raw_scores.reshape(-1, 1)).flatten()
+🛡️ Risk Labels
+Each wallet is assigned a risk category:
 
-## 🧪 How to Run
+Score Range	Risk Level
+0 – 200	High Risk
+201 – 500	Moderate Risk
+501 – 1000	Low Risk
+
+🧪 How to Run
+bash
+Copy
+Edit
+# Clone the repo
+git clone https://github.com/yourusername/defi-credit-scoring-aave-v2.git
+cd defi-credit-scoring-aave-v2
+
+# Run the scoring pipeline
+python main.py /path/to/your/aave_v2_data.json
 
 ```bash
 python main.py /path/to/user-wallet-transactions.json
