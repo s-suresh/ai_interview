@@ -135,11 +135,12 @@ final_scores = MinMaxScaler((0, 1000)).fit_transform(raw_scores.reshape(-1, 1)).
 Each wallet is assigned a risk category:
 
 Score Range	Risk Level
-|0 – 200   |	High Risk     |
-|201 – 500 |	Moderate Risk |
-|501 – 1000|	Low Risk      |
-
-##🧪 How to Run
+| Score Range     | Risk Level    |
+|------------------|----------------|
+| `0 – 200`        | High Risk      |
+| `201 – 500`      | Moderate Risk  |
+| `501 – 1000`     | Low Risk       |
+## 🧪 How to Run
 
 ```bash
 python main.py /path/to/user-wallet-transactions.json
