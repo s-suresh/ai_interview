@@ -103,6 +103,34 @@ After scoring, each wallet is labeled:
 
 ---
 
+## 📊 ML-Based Rescaling (Optional)
+
+After computing raw scores, we enhance resolution using an **XGBoost regressor** trained on wallet features to estimate relative credit strength.
+
+### Steps:
+
+1. Features are scaled using `MinMaxScaler`
+2. A regression model is trained using mean-based proxy targets (e.g., row-wise feature mean)
+3. Predicted scores are min-max scaled to the range **[0, 1000]**
+
+This step gives a smoother distribution and helps distinguish wallets with similar rule-based scores.
+
+```python
+from xgboost import XGBRegressor
+from sklearn.preprocessing import MinMaxScaler
+
+# Normalize features
+scaler = MinMaxScaler()
+X_scaled = scaler.fit_transform(features)
+
+# Train ML model
+model = XGBRegressor()
+model.fit(X_scaled, y)  # y is proxy label (e.g., row-wise mean)
+
+# Predict and scale
+raw_scores = model.predict(X_scaled)
+final_scores = MinMaxScaler((0, 1000)).fit_transform(raw_scores.reshape(-1, 1)).flatten() ```
+
 ## 🧪 How to Run
 
 ```bash
