@@ -1,11 +1,16 @@
 ### ai_interview
 # DeFi Wallet Credit Scoring – Aave V2
 
-This project assigns a **credit score (0–1000)** to wallets interacting with the Aave V2 protocol, based on their historical transaction behavior. It uses features engineered from raw transaction-level data such as deposits, borrows, repayments, liquidations, and activity timelines.
+This project assigns a **credit score between 0 and 1000** to wallets interacting with the **Aave V2** protocol. The scoring is based entirely on **on-chain transaction behavior** — including borrowing, repayment, deposit history, liquidations, and activity timelines.
 
-# 🧠 DeFi Wallet Credit Scoring – Aave V2 Protocol
+It uses features engineered from raw transaction-level data such as:
 
-This project assigns a **credit score between 0 and 1000** to each wallet interacting with the Aave V2 protocol. The scoring is based entirely on on-chain transaction behavior — including borrowing, repayment, deposit history, liquidations, and activity patterns.
+- ✅ Deposits
+- 🔁 Borrows and Repayments
+- ⚠️ Liquidations
+- 📅 Wallet activity span and frequency
+
+The goal is to **quantify wallet creditworthiness** using a transparent, rule-based model suitable for DeFi lending, risk dashboards, and on-chain credit assessments.
 
 ---
 
